@@ -18,6 +18,17 @@
   <script>
     const API = 'https://full-stack-app-make.onrender.com/todos';
 
+    // Frontend logger → sends to Splunk HEC directly from browser
+    function logToSplunk(message, data = {}) {
+      const entry = { level: 'info', source: 'frontend', message, ...data, time: new Date().toISOString() };
+      console.log(JSON.stringify(entry));
+      fetch('https://prd-p-wb8kq.splunkcloud.com:8088/services/collector/event', {
+        method: 'POST',
+        headers: { 'Authorization': 'Splunk 9541b037-c554-444b-8e66-ff70f38baf01' },
+        body: JSON.stringify({ event: entry, sourcetype: '_json', source: 'frontend-todo-app' })
+      }).catch(() => {}); // silently fail if Splunk is unreachable
+    }
+
     async function loadTodos() {
       const res = await fetch(API);
       const todos = await res.json();
@@ -44,17 +55,20 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: input.value.trim() })
       });
+      logToSplunk('todo added', { text: input.value.trim() });
       input.value = '';
       loadTodos();
     }
 
     async function toggleTodo(id) {
       await fetch(`${API}/${id}/toggle`, { method: 'PATCH' });
+      logToSplunk('todo toggled', { id });
       loadTodos();
     }
 
     async function deleteTodo(id) {
       await fetch(`${API}/${id}`, { method: 'DELETE' });
+      logToSplunk('todo deleted', { id });
       loadTodos();
     }
 
