@@ -39,7 +39,9 @@ const server = http.createServer((req, res) => {
   if (req.method === 'OPTIONS') return send(res, 204, {});
 
   const url = req.url;
-  log('info', 'incoming request', { method: req.method, url });
+  if (url !== '/health' && url !== '/') {
+    log('info', 'incoming request', { method: req.method, url });
+  }
 
   if (req.method === 'GET' && url === '/todos') {
     log('info', 'fetched todos', { count: todos.length });
