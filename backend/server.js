@@ -95,6 +95,10 @@ const server = http.createServer((req, res) => {
   send(res, 404, { error: 'Not found' });
 });
 
-server.listen(3000, () => {
-  log('info', 'Server started', { port: 3000 });
-});
+if (!process.env.TEST_PORT) {
+  server.listen(3000, () => {
+    log('info', 'Server started', { port: 3000 });
+  });
+}
+
+module.exports = server;
