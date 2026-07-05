@@ -81,6 +81,17 @@ const server = http.createServer((req, res) => {
   }
 
   log('warn', 'route not found', { method: req.method, url });
+  if (req.method === 'POST' && url === '/log') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      const data = JSON.parse(body);
+      log('info', data.message || 'frontend log', { source: 'frontend', ...data });
+      send(res, 200, { ok: true });
+    });
+    return;
+  }
+
   send(res, 404, { error: 'Not found' });
 });
 

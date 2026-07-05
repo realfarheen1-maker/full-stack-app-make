@@ -18,15 +18,15 @@
   <script>
     const API = 'https://full-stack-app-make.onrender.com/todos';
 
-    // Frontend logger → sends to Splunk HEC directly from browser
+    // Frontend logger → sends to backend which forwards to Splunk
     function logToSplunk(message, data = {}) {
-      const entry = { level: 'info', source: 'frontend', message, ...data, time: new Date().toISOString() };
+      const entry = { message, ...data };
       console.log(JSON.stringify(entry));
-      fetch('https://prd-p-wb8kq.splunkcloud.com:8088/services/collector/event', {
+      fetch('https://full-stack-app-make.onrender.com/log', {
         method: 'POST',
-        headers: { 'Authorization': 'Splunk 9541b037-c554-444b-8e66-ff70f38baf01' },
-        body: JSON.stringify({ event: entry, sourcetype: '_json', source: 'frontend-todo-app' })
-      }).catch(() => {}); // silently fail if Splunk is unreachable
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry)
+      }).catch(() => {});
     }
 
     async function loadTodos() {
