@@ -1,4 +1,26 @@
 const http = require('http');
+const SplunkLogger = require('splunk-logging').Logger;
+
+// --- Splunk setup ---
+// To use Splunk: set these env variables on Render:
+//   SPLUNK_TOKEN = your HEC token
+//   SPLUNK_URL   = your Splunk HEC endpoint (e.g. https://your-instance.splunkcloud.com:8088)
+const splunkConfig = {
+  token: process.env.SPLUNK_TOKEN || 'YOUR_SPLUNK_HEC_TOKEN',
+  url: process.env.SPLUNK_URL || 'https://your-instance.splunkcloud.com:8088'
+};
+const splunk = new SplunkLogger(splunkConfig);
+
+function log(level, message, data = {}) {
+  const entry = { level, message, ...data, time: new Date().toISOString() };
+  console.log(JSON.stringify(entry));
+  if (process.env.SPLUNK_TOKEN) {
+    splunk.send({ message: entry }, (err) => {
+      if (err) console.error('Splunk error:', err.message);
+    });
+  }
+}
+// --------------------
 
 let todos = [];
 let nextId = 1;
@@ -17,8 +39,10 @@ const server = http.createServer((req, res) => {
   if (req.method === 'OPTIONS') return send(res, 204, {});
 
   const url = req.url;
+  log('info', 'incoming request', { method: req.method, url });
 
   if (req.method === 'GET' && url === '/todos') {
+    log('info', 'fetched todos', { count: todos.length });
     return send(res, 200, todos);
   }
 
@@ -29,6 +53,7 @@ const server = http.createServer((req, res) => {
       const { text } = JSON.parse(body);
       const todo = { id: nextId++, text, done: false };
       todos.push(todo);
+      log('info', 'todo created', { todo });
       send(res, 201, todo);
     });
     return;
@@ -37,18 +62,26 @@ const server = http.createServer((req, res) => {
   const toggleMatch = url.match(/^\/todos\/(\d+)\/toggle$/);
   if (req.method === 'PATCH' && toggleMatch) {
     const todo = todos.find(t => t.id === parseInt(toggleMatch[1]));
-    if (!todo) return send(res, 404, { error: 'Not found' });
+    if (!todo) {
+      log('warn', 'todo not found for toggle', { id: toggleMatch[1] });
+      return send(res, 404, { error: 'Not found' });
+    }
     todo.done = !todo.done;
+    log('info', 'todo toggled', { todo });
     return send(res, 200, todo);
   }
 
   const deleteMatch = url.match(/^\/todos\/(\d+)$/);
   if (req.method === 'DELETE' && deleteMatch) {
     todos = todos.filter(t => t.id !== parseInt(deleteMatch[1]));
+    log('info', 'todo deleted', { id: deleteMatch[1] });
     return send(res, 200, { ok: true });
   }
 
+  log('warn', 'route not found', { method: req.method, url });
   send(res, 404, { error: 'Not found' });
 });
 
-server.listen(3000, () => console.log('Server running on http://localhost:3000'));
+server.listen(3000, () => {
+  log('info', 'Server started', { port: 3000 });
+});
